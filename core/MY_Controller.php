@@ -1,4 +1,5 @@
-<?php
+<?php  if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+
 /**
  * A base controller for CodeIgniter with view autoloading, layout support,
  * model loading, asides/partials and per-controller 404
@@ -8,11 +9,17 @@
  */
 
 class MY_Controller extends CI_Controller
-{    
+{
 
     /* --------------------------------------------------------------
      * VARIABLES
      * ------------------------------------------------------------ */
+
+    /**
+     * Define a default action for this controller if index()
+     * is not available
+     */
+    protected $index = '';
 
     /**
      * The current request's view. Automatically guessed
@@ -32,10 +39,16 @@ class MY_Controller extends CI_Controller
     protected $layout;
 
     /**
-     * An arbitrary list of asides/partials to be loaded into
+     * An arbitrary list of asides to be loaded into
      * the layout. The key is the declared name, the value the file
      */
     protected $asides = array();
+
+    /**
+     * An arbitrary list of partials to be included into
+     * the layout. The key is the declared name, the value the content
+     */
+    protected $partials = array();
 
     /**
      * A list of models to be autoloaded
@@ -47,6 +60,11 @@ class MY_Controller extends CI_Controller
      * The percent symbol (%) will be replaced with the model name.
      */
     protected $model_string = '%_model';
+
+    /**
+     * Whether or not to use the CI Parser when loading views
+     */
+    protected $use_parser = FALSE;
 
     /* --------------------------------------------------------------
      * GENERIC METHODS
@@ -80,7 +98,12 @@ class MY_Controller extends CI_Controller
         }
         else
         {
-            if (method_exists($this, '_404'))
+            if (!empty($this->index) && method_exists($this, $this->index))
+            {
+                $this->router->method = $this->index;
+                call_user_func_array(array($this, $this->index), array_slice($this->uri->rsegments, 2));
+            }
+            elseif (method_exists($this, '_404'))
             {
                 call_user_func_array(array($this, '_404'), array($method));
             }
@@ -102,18 +125,27 @@ class MY_Controller extends CI_Controller
         // If $this->view == FALSE, we don't want to load anything
         if ($this->view !== FALSE)
         {
-            // If $this->view isn't empty, load it. If it isn't, try and guess based on the controller and action name
-            $view = (!empty($this->view)) ? $this->view : $this->router->directory . $this->router->class . '/' . $this->router->method;
+            // If $this->view isn't empty, load it. If it is empty, try and guess based on the controller and action name
+            $view = (!empty($this->view)) ? $this->view : ($this->router->fetch_module()) ? $this->router->class . '/' . $this->router->method : $this->router->directory . $this->router->class . '/' . $this->router->method;
 
             // Load the view into $yield
-            $data['yield'] = $this->load->view($view, $this->data, TRUE);
+            $data['yield'] = $this->_load($view, $this->data, TRUE);
 
             // Do we have any asides? Load them.
             if (!empty($this->asides))
             {
                 foreach ($this->asides as $name => $file)
                 {
-                    $data['yield_'.$name] = $this->load->view($file, $this->data, TRUE);
+                    $data['yield_'.$name] = $this->_load($file, $this->data, TRUE);
+                }
+            }
+
+            // Do we have any partials? Add them.
+            if (!empty($this->partials))
+            {
+                foreach ($this->partials as $name => $content)
+                {
+                    $data['yield_'.$name] = $content;
                 }
             }
 
@@ -149,8 +181,23 @@ class MY_Controller extends CI_Controller
             // Otherwise? Load away :)
             else
             {
-                $this->load->view($layout, $data);
+                $this->_load($layout, $data);
             }
+        }
+    }
+
+    /**
+     * Load the view, or parse the template ...
+     */
+    protected function _load($view, $data, $return = FALSE)
+    {
+        if ($this->use_parser)
+        {
+            return $this->parser->parse($view, $data, $return);
+        }
+        else
+        {
+            return $this->load->view($view, $data, $return);
         }
     }
 
@@ -165,7 +212,7 @@ class MY_Controller extends CI_Controller
     {
         foreach ($this->models as $model)
         {
-        	$alias = ($m = strpos($model, '/')) ? substr($model, $m+1) : $model;
+            $alias = ($m = strpos($model, '/')) ? substr($model, $m+1) : $model;
             $this->load->model($this->_model_name($model), $alias);
         }
     }
