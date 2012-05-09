@@ -5,6 +5,8 @@
  * model loading, asides/partials and per-controller 404
  *
  * @link http://github.com/jamierumbelow/codeigniter-base-controller
+ * @author Jamie Rumbelow <http://jamierumbelow.net>
+ * @modified Justin Busschau <http://bythepeople.co.uk>
  * @copyright Copyright (c) 2012, Jamie Rumbelow <http://jamierumbelow.net>
  */
 
@@ -66,6 +68,13 @@ class MY_Controller extends CI_Controller
      */
     protected $use_parser = FALSE;
 
+    /**
+     * Load controller-specific language files.
+     * If set to FALSE, nothing is loaded
+     * Otherwise load the lang file(s) indicated
+     */
+    protected $translate = TRUE;
+
     /* --------------------------------------------------------------
      * GENERIC METHODS
      * ------------------------------------------------------------ */
@@ -79,6 +88,7 @@ class MY_Controller extends CI_Controller
         parent::__construct();
 
         $this->_load_models();
+        $this->_load_translation();
     }
 
     /* --------------------------------------------------------------
@@ -126,7 +136,7 @@ class MY_Controller extends CI_Controller
         if ($this->view !== FALSE)
         {
             // If $this->view isn't empty, load it. If it is empty, try and guess based on the controller and action name
-            $view = (!empty($this->view)) ? $this->view : ($this->router->fetch_module()) ? $this->router->class . '/' . $this->router->method : $this->router->directory . $this->router->class . '/' . $this->router->method;
+            $view = (!empty($this->view)) ? $this->view : (($this->router->fetch_module()) ? $this->router->class . '/' . $this->router->method : $this->router->directory . $this->router->class . '/' . $this->router->method);
 
             // Load the view into $yield
             $data['yield'] = $this->_load($view, $this->data, TRUE);
@@ -224,5 +234,41 @@ class MY_Controller extends CI_Controller
     protected function _model_name($model)
     {
         return str_replace('%', $model, $this->model_string);
+    }
+
+    /* --------------------------------------------------------------
+     * TRANSLATION
+     * ------------------------------------------------------------ */
+
+    /**
+     * Load lang files based on the $this->translate variable
+     * This function relies on the default language set in your
+     * application/config/config.php file or set programatically
+     * to allow for run-time language changes
+     */
+    private function _load_translation()
+    {
+    	// if $this->translate is FALSE we don't load anything
+		if ($this->translate !== FALSE)
+		{
+			if (is_array($this->translate))
+			{
+				foreach ($this->translate as $lang)
+				{
+					$this->lang->load($lang);
+				}
+			}
+			// if $this->translate is true, we guess a translation filename
+			elseif ($this->translate === TRUE)
+			{
+				$this->lang->load($this->router->class);
+			}
+
+			// otherwise we assume a filename is given and load that
+			else
+			{
+				$this->lang->load($this->translate);
+			}
+		}
     }
 }
